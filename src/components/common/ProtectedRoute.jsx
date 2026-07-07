@@ -12,7 +12,15 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/" replace />;
   }
 
-  if (!profile?.is_active) {
+  if (!profile) {
+    return (
+      <div style={{ padding: 24 }}>
+        No employee profile found for this login. Please contact HR.
+      </div>
+    );
+  }
+
+  if (profile.is_active === false) {
     return (
       <div style={{ padding: 24 }}>
         Your account is inactive. Please contact HR.
