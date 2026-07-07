@@ -1,9 +1,20 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
 import { signInWithGoogle } from "../../services/authService";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function LoginPage() {
+  const { user, profile, loading: authLoading } = useAuth();
   const [errorText, setErrorText] = useState("");
   const [loading, setLoading] = useState(false);
+
+  if (authLoading) {
+    return <div style={{ padding: 24 }}>Loading...</div>;
+  }
+
+  if (user && profile) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   async function handleLogin() {
     setErrorText("");

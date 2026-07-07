@@ -11,6 +11,12 @@ export function useAuth() {
     const authUserId = authUser?.id;
     const userEmail = authUser?.email?.toLowerCase();
 
+    console.log("AUTH DEBUG - Google user:", {
+      authUserId,
+      userEmail,
+      rawEmail: authUser?.email,
+    });
+
     if (!authUserId || !userEmail) {
       setProfile(null);
       return;
@@ -32,6 +38,11 @@ export function useAuth() {
       .eq("auth_user_id", authUserId)
       .maybeSingle();
 
+    console.log("AUTH DEBUG - linked profile lookup:", {
+      linkedProfile,
+      linkedProfileError,
+    });
+
     if (linkedProfileError) {
       console.error("Profile load error:", linkedProfileError.message);
       setProfile(null);
@@ -43,62 +54,27 @@ export function useAuth() {
       return;
     }
 
-    const { data: invitedProfile, error: invitedProfileError } = await supabase
-      .from("profiles")
-      .select(
-        `
-        id,
-        auth_user_id,
-        full_name,
-        verifinity_email,
-        role,
-        onboarding_status,
-        is_active
-      `,
-      )
-      .ilike("verifinity_email", userEmail)
-      .is("auth_user_id", null)
-      .maybeSingle();
+    const { data: linkedByEmailProfile, error: linkByEmailError } =
+      await supabase.rpc("link_profile_by_email").maybeSingle();
 
-    if (invitedProfileError) {
-      console.error(
-        "Invited profile lookup error:",
-        invitedProfileError.message,
-      );
+    console.log("AUTH DEBUG - profile RPC link:", {
+      linkedByEmailProfile,
+      linkByEmailError,
+    });
+
+    if (linkByEmailError) {
+      console.error("Profile linking RPC error:", linkByEmailError.message);
       setProfile(null);
       return;
     }
 
-    if (!invitedProfile) {
+    if (!linkedByEmailProfile) {
       console.error("No employee profile found for:", userEmail);
       setProfile(null);
       return;
     }
 
-    const { data: updatedProfile, error: updateError } = await supabase
-      .from("profiles")
-      .update({ auth_user_id: authUserId })
-      .eq("id", invitedProfile.id)
-      .select(
-        `
-        id,
-        auth_user_id,
-        full_name,
-        verifinity_email,
-        role,
-        onboarding_status,
-        is_active
-      `,
-      )
-      .single();
-
-    if (updateError) {
-      console.error("Profile linking error:", updateError.message);
-      setProfile(null);
-      return;
-    }
-
-    setProfile(updatedProfile);
+    setProfile(linkedByEmailProfile);
   }
 
   useEffect(() => {
