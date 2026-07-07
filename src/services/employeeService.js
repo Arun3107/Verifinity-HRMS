@@ -91,7 +91,7 @@ export async function getEmployeeById(employeeId) {
     `,
     )
     .eq("id", employeeId)
-    .single();
+    .maybeSingle();
 
   if (error) throw error;
 
@@ -108,28 +108,24 @@ export async function getMyProfileBundle(userId) {
       full_name,
       verifinity_email,
       phone,
+      department_id,
+      manager_id,
       designation,
       date_of_joining,
       employment_status,
       role,
       onboarding_status,
-      is_active,
-      departments (
-        id,
-        name
-      ),
-      manager:manager_id (
-        id,
-        full_name,
-        verifinity_email,
-        designation
-      )
+      is_active
     `,
     )
     .eq("id", userId)
-    .single();
+    .maybeSingle();
 
   if (profileError) throw profileError;
+
+  if (!profile) {
+    throw new Error("Employee profile not found.");
+  }
 
   const { data: payroll, error: payrollError } = await supabase
     .from("employee_payroll_details")

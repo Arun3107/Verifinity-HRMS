@@ -158,7 +158,7 @@ function Field({ label, required, children }) {
 }
 
 export default function MyProfilePage() {
-  const { user } = useAuth();
+  const { user, profile: authProfile } = useAuth();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -193,10 +193,10 @@ export default function MyProfilePage() {
     let isMounted = true;
 
     async function loadProfile() {
-      if (!user?.id) return;
+      if (!authProfile?.id) return;
 
       try {
-        const data = await getMyProfileBundle(user.id);
+        const data = await getMyProfileBundle(authProfile.id);
 
         if (!isMounted) return;
 
@@ -240,7 +240,7 @@ export default function MyProfilePage() {
     return () => {
       isMounted = false;
     };
-  }, [user?.id]);
+  }, [authProfile?.id]);
 
   function updateField(field, value) {
     setForm((current) => ({
@@ -256,7 +256,7 @@ export default function MyProfilePage() {
     setSaving(true);
 
     try {
-      await submitMyProfile(user.id, form);
+      await submitMyProfile(authProfile.id, form);
       setSuccessText("Profile submitted successfully for HR review.");
       setProfile((current) => ({
         ...current,
