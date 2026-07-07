@@ -46,23 +46,16 @@ export async function getManagerOptions() {
 }
 
 export async function createEmployeeProfile(payload) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .insert({
-      full_name: payload.fullName,
-      verifinity_email: payload.email,
-      auth_user_id: null,
-      department_id: payload.departmentId || null,
-      designation: payload.designation || null,
-      manager_id: payload.managerId || null,
-      date_of_joining: payload.dateOfJoining || null,
-      employment_status: payload.employmentStatus,
-      role: payload.role,
-      onboarding_status: "invited",
-      is_active: true,
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("create_employee_profile", {
+    p_full_name: payload.fullName,
+    p_verifinity_email: payload.email,
+    p_department_id: payload.departmentId || null,
+    p_designation: payload.designation || null,
+    p_manager_id: payload.managerId || null,
+    p_date_of_joining: payload.dateOfJoining || null,
+    p_employment_status: payload.employmentStatus,
+    p_role: payload.role,
+  });
 
   if (error) throw error;
 
