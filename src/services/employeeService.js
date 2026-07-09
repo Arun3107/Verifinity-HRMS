@@ -169,14 +169,12 @@ export async function getMyProfileBundle(userId) {
   }
 
   if (profile.manager_id) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("id, full_name, designation, verifinity_email")
-      .eq("id", profile.manager_id)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc("get_basic_profile_by_id", {
+      p_profile_id: profile.manager_id,
+    });
 
     if (error) throw error;
-    manager = data;
+    manager = Array.isArray(data) ? data[0] || null : data;
   }
 
   const { data: payroll, error: payrollError } = await supabase
