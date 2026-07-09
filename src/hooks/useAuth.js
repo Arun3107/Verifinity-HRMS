@@ -11,12 +11,6 @@ export function useAuth() {
     const authUserId = authUser?.id;
     const userEmail = authUser?.email?.toLowerCase();
 
-    console.log("AUTH DEBUG - Google user:", {
-      authUserId,
-      userEmail,
-      rawEmail: authUser?.email,
-    });
-
     if (!authUserId || !userEmail) {
       setProfile(null);
       return;
@@ -38,11 +32,6 @@ export function useAuth() {
       .eq("auth_user_id", authUserId)
       .maybeSingle();
 
-    console.log("AUTH DEBUG - linked profile lookup:", {
-      linkedProfile,
-      linkedProfileError,
-    });
-
     if (linkedProfileError) {
       console.error("Profile load error:", linkedProfileError.message);
       setProfile(null);
@@ -56,11 +45,6 @@ export function useAuth() {
 
     const { data: linkedByEmailProfile, error: linkByEmailError } =
       await supabase.rpc("link_profile_by_email").maybeSingle();
-
-    console.log("AUTH DEBUG - profile RPC link:", {
-      linkedByEmailProfile,
-      linkByEmailError,
-    });
 
     if (linkByEmailError) {
       console.error("Profile linking RPC error:", linkByEmailError.message);

@@ -11,6 +11,7 @@ export async function getEmployees() {
       designation,
       employment_status,
       role,
+      onboarding_status,
       is_active
     `,
     )
@@ -63,7 +64,7 @@ export async function createEmployeeProfile(payload) {
 }
 
 export async function getEmployeeById(employeeId) {
-  const { data, error } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select(
       `
@@ -72,30 +73,55 @@ export async function getEmployeeById(employeeId) {
       full_name,
       verifinity_email,
       phone,
+      department_id,
+      manager_id,
       designation,
       date_of_joining,
       employment_status,
       role,
       onboarding_status,
-      is_active,
-      departments (
-        id,
-        name
-      ),
-      manager:manager_id (
-        id,
-        full_name,
-        verifinity_email,
-        designation
-      )
+      is_active
     `,
     )
     .eq("id", employeeId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (profileError) throw profileError;
 
-  return data;
+  if (!profile) {
+    throw new Error("Employee profile not found.");
+  }
+
+  let department = null;
+  let manager = null;
+
+  if (profile.department_id) {
+    const { data, error } = await supabase
+      .from("departments")
+      .select("id, name")
+      .eq("id", profile.department_id)
+      .maybeSingle();
+
+    if (error) throw error;
+    department = data;
+  }
+
+  if (profile.manager_id) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, verifinity_email, designation")
+      .eq("id", profile.manager_id)
+      .maybeSingle();
+
+    if (error) throw error;
+    manager = data;
+  }
+
+  return {
+    ...profile,
+    departments: department,
+    manager,
+  };
 }
 
 export async function getMyProfileBundle(userId) {
@@ -390,12 +416,21 @@ export async function getAdminDashboardStats() {
 }
 
 export async function getEmployeeDashboardStats(userId) {
-  const [profileResult, documentsResult] = await Promise.all([
+  const [profileResult, payrollResult, documentsResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("phone, onboarding_status")
+      .select(
+        "phone, onboarding_status, date_of_joining, designation, manager_id",
+      )
       .eq("id", userId)
-      .single(),
+      .maybeSingle(),
+
+    supabase
+      .from("employee_payroll_details")
+      .select("pan_number, aadhaar_number, personal_email")
+      .eq("employee_id", userId)
+      .maybeSingle(),
+
     supabase
       .from("employee_documents")
       .select("document_type")
@@ -403,35 +438,47 @@ export async function getEmployeeDashboardStats(userId) {
   ]);
 
   if (profileResult.error) throw profileResult.error;
+  if (payrollResult.error) throw payrollResult.error;
   if (documentsResult.error) throw documentsResult.error;
+
+  const profile = profileResult.data || {};
+  const payroll = payrollResult.data || {};
 
   const requiredDocumentTypes = [
     "pan_card",
     "aadhaar_card",
     "cancelled_cheque",
   ];
+
   const uploadedTypes = new Set(
     (documentsResult.data || []).map((document) => document.document_type),
   );
+
   const uploadedRequiredCount = requiredDocumentTypes.filter((type) =>
     uploadedTypes.has(type),
   ).length;
 
   let profileCompletion = 0;
 
-  if (profileResult.data?.phone) profileCompletion += 50;
+  if (profile.phone) profileCompletion += 20;
+  if (payroll.personal_email) profileCompletion += 20;
+  if (payroll.pan_number) profileCompletion += 20;
+  if (payroll.aadhaar_number) profileCompletion += 20;
   if (
-    profileResult.data?.onboarding_status === "submitted" ||
-    profileResult.data?.onboarding_status === "approved"
+    profile.onboarding_status === "submitted" ||
+    profile.onboarding_status === "approved"
   ) {
-    profileCompletion += 50;
+    profileCompletion += 20;
   }
 
   return {
     profileCompletion,
     uploadedRequiredCount,
     requiredDocumentCount: requiredDocumentTypes.length,
-    onboardingStatus: profileResult.data?.onboarding_status || "pending",
+    onboardingStatus: profile.onboarding_status || "invited",
+    dateOfJoining: profile.date_of_joining,
+    designation: profile.designation,
+    managerId: profile.manager_id,
   };
 }
 

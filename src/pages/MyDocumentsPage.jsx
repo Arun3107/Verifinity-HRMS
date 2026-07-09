@@ -20,7 +20,7 @@ function getDocumentLabel(documentType) {
 }
 
 export default function MyDocumentsPage() {
-  const { user } = useAuth();
+  const { profile: authProfile } = useAuth();
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -30,10 +30,10 @@ export default function MyDocumentsPage() {
 
   useEffect(() => {
     async function loadDocuments() {
-      if (!user?.id) return;
+      if (!authProfile?.id) return;
 
       try {
-        const data = await getMyDocuments(user.id);
+        const data = await getMyDocuments(authProfile.id);
         setDocuments(data);
       } catch (error) {
         console.error(error);
@@ -44,7 +44,7 @@ export default function MyDocumentsPage() {
     }
 
     loadDocuments();
-  }, [user?.id]);
+  }, [authProfile?.id]);
 
   function hasDocument(documentType) {
     return documents.some(
@@ -53,7 +53,7 @@ export default function MyDocumentsPage() {
   }
 
   async function handleDocumentUpload(documentType, file) {
-    if (!file || !user?.id) return;
+    if (!file || !authProfile?.id) return;
 
     setErrorText("");
     setSuccessText("");
@@ -61,7 +61,7 @@ export default function MyDocumentsPage() {
 
     try {
       const uploadedDocument = await uploadMyDocument(
-        user.id,
+        authProfile.id,
         documentType,
         file,
       );

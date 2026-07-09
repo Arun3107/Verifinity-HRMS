@@ -98,6 +98,38 @@ function PlaceholderPanel({ title, description }) {
   );
 }
 
+// Helper functions for onboarding status label and badge style
+function getOnboardingLabel(status) {
+  if (status === "submitted") return "Submitted for Review";
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  return "Invited";
+}
+
+function getOnboardingBadgeStyle(status) {
+  const base = {
+    padding: "7px 10px",
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 800,
+    textTransform: "capitalize",
+  };
+
+  if (status === "submitted") {
+    return { ...base, background: "#dbeafe", color: "#1d4ed8" };
+  }
+
+  if (status === "approved") {
+    return { ...base, background: "#dcfce7", color: "#166534" };
+  }
+
+  if (status === "rejected") {
+    return { ...base, background: "#fee2e2", color: "#991b1b" };
+  }
+
+  return { ...base, background: "#fef3c7", color: "#92400e" };
+}
+
 export default function EmployeeDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -240,6 +272,7 @@ export default function EmployeeDetailsPage() {
         ...current,
         onboarding_status: "approved",
       }));
+      setSuccessText("Employee onboarding approved successfully.");
     } catch (error) {
       console.error(error);
       alert("Unable to approve onboarding.");
@@ -258,6 +291,7 @@ export default function EmployeeDetailsPage() {
         ...current,
         onboarding_status: "rejected",
       }));
+      setSuccessText("Employee onboarding rejected.");
     } catch (error) {
       console.error(error);
       alert("Unable to reject onboarding.");
@@ -374,17 +408,11 @@ export default function EmployeeDetailsPage() {
             </span>
 
             <span
-              style={{
-                padding: "7px 10px",
-                borderRadius: 999,
-                background: "#eff6ff",
-                color: "#1d4ed8",
-                fontSize: 13,
-                fontWeight: 800,
-                textTransform: "capitalize",
-              }}
+              style={getOnboardingBadgeStyle(
+                employee.onboarding_status || "invited",
+              )}
             >
-              {employee.onboarding_status || "pending"}
+              {getOnboardingLabel(employee.onboarding_status)}
             </span>
           </div>
         </div>
@@ -455,6 +483,81 @@ export default function EmployeeDetailsPage() {
             gap: 18,
           }}
         >
+          {/* Onboarding Review Card */}
+          <DetailCard title="Onboarding Review">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: "#64748b",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Current Status
+                </div>
+
+                <div style={{ marginTop: 8 }}>
+                  <span
+                    style={getOnboardingBadgeStyle(
+                      employee.onboarding_status || "invited",
+                    )}
+                  >
+                    {getOnboardingLabel(employee.onboarding_status)}
+                  </span>
+                </div>
+              </div>
+
+              {employee.onboarding_status !== "approved" &&
+                employee.onboarding_status !== "rejected" && (
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      disabled={statusUpdating}
+                      onClick={handleApproveOnboarding}
+                      style={{
+                        border: 0,
+                        background: "#16a34a",
+                        color: "#ffffff",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        cursor: statusUpdating ? "not-allowed" : "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Approve Onboarding
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={statusUpdating}
+                      onClick={handleRejectOnboarding}
+                      style={{
+                        border: 0,
+                        background: "#dc2626",
+                        color: "#ffffff",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        cursor: statusUpdating ? "not-allowed" : "pointer",
+                        fontWeight: 800,
+                      }}
+                    >
+                      Reject Onboarding
+                    </button>
+                  </div>
+                )}
+            </div>
+          </DetailCard>
+
           <DetailCard title="Employment Information">
             <form onSubmit={handleSaveEmploymentInfo}>
               <div

@@ -19,6 +19,40 @@ import {
 
 const adminRoles = ["admin", "hr", "payroll"];
 
+function formatOnboardingStatus(status) {
+  if (status === "submitted") return "Submitted for Review";
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  if (status === "invited") return "Invited";
+  return "Pending";
+}
+
+function getCompletionMessage(
+  profileCompletion,
+  uploadedRequiredCount,
+  requiredDocumentCount,
+) {
+  if (
+    profileCompletion >= 100 &&
+    uploadedRequiredCount >= requiredDocumentCount
+  ) {
+    return "Your profile and required documents are complete.";
+  }
+
+  if (
+    profileCompletion < 100 &&
+    uploadedRequiredCount < requiredDocumentCount
+  ) {
+    return "Please complete your profile and upload the required documents.";
+  }
+
+  if (profileCompletion < 100) {
+    return "Please complete the remaining profile details.";
+  }
+
+  return "Please upload the remaining required documents.";
+}
+
 export default function DashboardPage({ dashboardType = "employee" }) {
   const { role, profile } = useAuth();
   const [stats, setStats] = useState(null);
@@ -154,6 +188,73 @@ export default function DashboardPage({ dashboardType = "employee" }) {
           );
         })}
       </div>
+
+      {!isAdminDashboard && (
+        <div
+          style={{
+            marginTop: 24,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 16,
+          }}
+        >
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 16,
+              padding: 20,
+            }}
+          >
+            <div
+              style={{ fontWeight: 800, color: "#111827", marginBottom: 12 }}
+            >
+              Onboarding Summary
+            </div>
+
+            <div style={{ color: "#64748b", lineHeight: 1.7 }}>
+              Status:{" "}
+              <strong style={{ color: "#111827" }}>
+                {formatOnboardingStatus(stats?.onboardingStatus)}
+              </strong>
+              <br />
+              Profile completion:{" "}
+              <strong style={{ color: "#111827" }}>
+                {stats?.profileCompletion ?? 0}%
+              </strong>
+              <br />
+              Required documents:{" "}
+              <strong style={{ color: "#111827" }}>
+                {stats?.uploadedRequiredCount ?? 0}/
+                {stats?.requiredDocumentCount ?? 3}
+              </strong>
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 16,
+              padding: 20,
+            }}
+          >
+            <div
+              style={{ fontWeight: 800, color: "#111827", marginBottom: 12 }}
+            >
+              Next Action
+            </div>
+
+            <div style={{ color: "#64748b", lineHeight: 1.7 }}>
+              {getCompletionMessage(
+                stats?.profileCompletion ?? 0,
+                stats?.uploadedRequiredCount ?? 0,
+                stats?.requiredDocumentCount ?? 3,
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div
         style={{
