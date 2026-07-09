@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Save } from "lucide-react";
+import { ArrowLeft, CalendarDays, IdCard, Save, UserPlus } from "lucide-react";
 import {
   createEmployeeProfile,
   getDepartments,
@@ -10,25 +10,37 @@ import {
 const inputStyle = {
   width: "100%",
   padding: "12px 14px",
-  border: "1px solid #d1d5db",
-  borderRadius: 10,
+  border: "1px solid #d8dee8",
+  borderRadius: 12,
   fontSize: 14,
   boxSizing: "border-box",
   background: "#ffffff",
   color: "#111827",
   outline: "none",
+  minHeight: 46,
 };
 
 const labelStyle = {
   display: "block",
-  fontSize: 13,
-  fontWeight: 700,
-  color: "#374151",
-  marginBottom: 7,
+  fontSize: 12,
+  fontWeight: 800,
+  color: "#334155",
+  marginBottom: 8,
+  letterSpacing: "0.02em",
+};
+
+const sectionCardStyle = {
+  background: "#ffffff",
+  border: "1px solid #e5e7eb",
+  borderRadius: 20,
+  padding: 24,
+  maxWidth: 1120,
+  boxShadow: "0 14px 34px rgba(15, 23, 42, 0.06)",
 };
 
 export default function EmployeeCreatePage() {
   const navigate = useNavigate();
+  const dateInputRef = useRef(null);
 
   const [departments, setDepartments] = useState([]);
   const [managers, setManagers] = useState([]);
@@ -36,13 +48,13 @@ export default function EmployeeCreatePage() {
   const [errorText, setErrorText] = useState("");
 
   const [form, setForm] = useState({
+    employeeCode: "",
     fullName: "",
     email: "",
     departmentId: "",
     designation: "",
     managerId: "",
     dateOfJoining: "",
-    employmentStatus: "active",
     role: "employee",
   });
 
@@ -78,7 +90,10 @@ export default function EmployeeCreatePage() {
     setSaving(true);
 
     try {
-      await createEmployeeProfile(form);
+      await createEmployeeProfile({
+        ...form,
+        employmentStatus: "active",
+      });
       navigate("/employees");
     } catch (error) {
       console.error(error);
@@ -89,45 +104,84 @@ export default function EmployeeCreatePage() {
   }
 
   return (
-    <div>
+    <div style={{ maxWidth: 1180 }}>
       <button
         type="button"
         onClick={() => navigate("/employees")}
         style={{
-          display: "flex",
+          display: "inline-flex",
           alignItems: "center",
           gap: 8,
-          border: 0,
-          background: "transparent",
+          border: "1px solid #dbeafe",
+          background: "#eff6ff",
           color: "#2563eb",
           cursor: "pointer",
           marginBottom: 18,
-          fontWeight: 700,
+          fontWeight: 800,
+          borderRadius: 999,
+          padding: "8px 12px",
         }}
       >
         <ArrowLeft size={16} />
         Back to Employees
       </button>
 
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: 0, color: "#111827" }}>Create Employee</h1>
-        <p style={{ color: "#64748b", marginTop: 6 }}>
-          Enter the basic employee details. HR can manually share the portal
-          link after creating the employee.
-        </p>
-      </div>
-
-      <form
-        onSubmit={handleSubmit}
+      <div
         style={{
-          background: "#ffffff",
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          padding: 24,
-          maxWidth: 1100,
-          boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
+          marginBottom: 22,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 20,
         }}
       >
+        <div>
+          <p
+            style={{
+              margin: "0 0 6px",
+              color: "#2563eb",
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+            }}
+          >
+            Admin Portal
+          </p>
+          <h1
+            style={{
+              margin: 0,
+              color: "#0f172a",
+              fontSize: 34,
+              lineHeight: 1.08,
+              letterSpacing: "-0.04em",
+            }}
+          >
+            Create Employee
+          </h1>
+          <p style={{ color: "#64748b", margin: "8px 0 0", fontSize: 15 }}>
+            Add basic employment details. The employee will be active by
+            default.
+          </p>
+        </div>
+
+        <div
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: 18,
+            background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+            color: "white",
+            display: "grid",
+            placeItems: "center",
+            boxShadow: "0 12px 24px rgba(37, 99, 235, 0.22)",
+          }}
+        >
+          <UserPlus size={24} />
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} style={sectionCardStyle}>
         {errorText && (
           <div
             style={{
@@ -150,6 +204,31 @@ export default function EmployeeCreatePage() {
             gap: 20,
           }}
         >
+          <div>
+            <label style={labelStyle}>Employee ID *</label>
+            <div style={{ position: "relative" }}>
+              <IdCard
+                size={17}
+                style={{
+                  position: "absolute",
+                  left: 13,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#94a3b8",
+                }}
+              />
+              <input
+                style={{ ...inputStyle, paddingLeft: 40 }}
+                value={form.employeeCode}
+                onChange={(event) =>
+                  updateField("employeeCode", event.target.value)
+                }
+                placeholder="EMP-001"
+                required
+              />
+            </div>
+          </div>
+
           <div>
             <label style={labelStyle}>Full Name *</label>
             <input
@@ -222,30 +301,37 @@ export default function EmployeeCreatePage() {
 
           <div>
             <label style={labelStyle}>Date of Joining</label>
-            <input
-              type="date"
-              style={inputStyle}
-              value={form.dateOfJoining}
-              onChange={(event) =>
-                updateField("dateOfJoining", event.target.value)
-              }
-            />
-          </div>
-
-          <div>
-            <label style={labelStyle}>Employment Status</label>
-            <select
-              style={inputStyle}
-              value={form.employmentStatus}
-              onChange={(event) =>
-                updateField("employmentStatus", event.target.value)
-              }
+            <div
+              style={{ position: "relative", cursor: "pointer" }}
+              onClick={() => {
+                if (dateInputRef.current?.showPicker) {
+                  dateInputRef.current.showPicker();
+                } else {
+                  dateInputRef.current?.focus();
+                }
+              }}
             >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-              <option value="probation">Probation</option>
-              <option value="notice_period">Notice Period</option>
-            </select>
+              <CalendarDays
+                size={17}
+                style={{
+                  position: "absolute",
+                  left: 13,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "#94a3b8",
+                  pointerEvents: "none",
+                }}
+              />
+              <input
+                type="date"
+                ref={dateInputRef}
+                style={{ ...inputStyle, paddingLeft: 40, cursor: "pointer" }}
+                value={form.dateOfJoining}
+                onChange={(event) =>
+                  updateField("dateOfJoining", event.target.value)
+                }
+              />
+            </div>
           </div>
 
           <div>
@@ -269,7 +355,9 @@ export default function EmployeeCreatePage() {
             display: "flex",
             justifyContent: "flex-end",
             gap: 12,
-            marginTop: 26,
+            marginTop: 28,
+            paddingTop: 20,
+            borderTop: "1px solid #f1f5f9",
           }}
         >
           <button
@@ -297,10 +385,10 @@ export default function EmployeeCreatePage() {
               alignItems: "center",
               gap: 8,
               border: 0,
-              background: "#2563eb",
+              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
               color: "#ffffff",
-              borderRadius: 10,
-              padding: "10px 14px",
+              borderRadius: 12,
+              padding: "11px 16px",
               cursor: saving ? "not-allowed" : "pointer",
               fontWeight: 700,
               opacity: saving ? 0.7 : 1,

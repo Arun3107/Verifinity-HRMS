@@ -11,7 +11,12 @@ import EmployeeDetailsPage from "./pages/employees/EmployeeDetailsPage";
 
 import MyProfilePage from "./pages/MyProfilePage";
 import MyDocumentsPage from "./pages/MyDocumentsPage";
+import MyLeavePage from "./pages/leave/MyLeavePage";
+import ManagerLeavePage from "./pages/leave/ManagerLeavePage";
 import DepartmentsPage from "./pages/admin/DepartmentsPage";
+import HolidayManagementPage from "./pages/admin/HolidayManagementPage";
+import LeavePolicyPage from "./pages/admin/LeavePolicyPage";
+import LeaveReportsPage from "./pages/admin/LeaveReportsPage";
 
 function App() {
   return (
@@ -70,8 +75,34 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/holidays"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "hr"]}>
+                <HolidayManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leave-policy"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "hr"]}>
+                <LeavePolicyPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/leave-reports"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "hr", "payroll"]}>
+                <LeaveReportsPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/profile" element={<MyProfilePage />} />
           <Route path="/my-documents" element={<MyDocumentsPage />} />
+          <Route path="/leave" element={<MyLeavePage />} />
+          <Route path="/manager-leave" element={<ManagerLeavePage />} />
         </Route>
       </Routes>
     </BrowserRouter>

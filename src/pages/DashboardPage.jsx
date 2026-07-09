@@ -16,6 +16,11 @@ import {
   getAdminDashboardStats,
   getEmployeeDashboardStats,
 } from "../services/employeeService";
+import {
+  getMyLeaveBalance,
+  getMyLeaveRequests,
+  getPendingLeaveApprovals,
+} from "../services/leaveService";
 
 const adminRoles = ["admin", "hr", "payroll"];
 
@@ -57,6 +62,12 @@ export default function DashboardPage({ dashboardType = "employee" }) {
   const { role, profile } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [leaveStats, setLeaveStats] = useState({
+    leaveBalance: 0,
+    pendingLeaveRequests: 0,
+    approvedLeaveRequests: 0,
+    pendingLeaveApprovals: 0,
+  });
 
   const canAccessAdminDashboard = adminRoles.includes(role);
   const isAdminDashboard = dashboardType === "admin" && canAccessAdminDashboard;
@@ -73,6 +84,34 @@ export default function DashboardPage({ dashboardType = "employee" }) {
           : await getEmployeeDashboardStats(profile.id);
 
         setStats(data);
+
+        if (isAdminDashboard) {
+          const pendingApprovals = await getPendingLeaveApprovals();
+          setLeaveStats((current) => ({
+            ...current,
+            pendingLeaveApprovals: pendingApprovals.length,
+          }));
+        } else {
+          const [leaveBalances, leaveRequests] = await Promise.all([
+            getMyLeaveBalance(),
+            getMyLeaveRequests(),
+          ]);
+
+          const paidLeaveBalance = leaveBalances.find(
+            (balance) => balance.leave_type?.code === "paid_leave",
+          );
+
+          setLeaveStats({
+            leaveBalance: Number(paidLeaveBalance?.available_balance || 0),
+            pendingLeaveRequests: leaveRequests.filter((request) =>
+              ["pending_manager", "pending_hr"].includes(request.status),
+            ).length,
+            approvedLeaveRequests: leaveRequests.filter(
+              (request) => request.status === "approved",
+            ).length,
+            pendingLeaveApprovals: 0,
+          });
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -105,7 +144,11 @@ export default function DashboardPage({ dashboardType = "employee" }) {
           value: stats?.employeesWithMissingDocuments ?? "-",
           icon: AlertTriangle,
         },
-        { label: "Pending Leave Approvals", value: "0", icon: CalendarClock },
+        {
+          label: "Pending Leave Approvals",
+          value: leaveStats.pendingLeaveApprovals,
+          icon: CalendarClock,
+        },
         { label: "Assets Issued", value: "0", icon: Laptop },
         { label: "Assets Pending Return", value: "0", icon: RotateCcw },
       ]
@@ -125,7 +168,21 @@ export default function DashboardPage({ dashboardType = "employee" }) {
           value: stats?.onboardingStatus || "pending",
           icon: ClipboardList,
         },
-        { label: "Leave Balance", value: "0", icon: CalendarDays },
+        {
+          label: "Leave Balance",
+          value: leaveStats.leaveBalance,
+          icon: CalendarDays,
+        },
+        {
+          label: "Pending Leave",
+          value: leaveStats.pendingLeaveRequests,
+          icon: CalendarClock,
+        },
+        {
+          label: "Approved Leave",
+          value: leaveStats.approvedLeaveRequests,
+          icon: CalendarDays,
+        },
       ];
 
   return (
@@ -271,8 +328,8 @@ export default function DashboardPage({ dashboardType = "employee" }) {
 
         <div style={{ color: "#64748b", lineHeight: 1.6 }}>
           {isAdminDashboard
-            ? "Employee and onboarding metrics are now connected to Supabase. Leave, timesheet, and asset metrics will appear after those modules are built."
-            : "Your profile and document completion metrics are connected to Supabase. Leave balance and timesheet reminders will appear after those modules are built."}
+            ? "Employee, onboarding, and pending leave approval metrics are now connected to Supabase. Timesheet and asset metrics will appear after those modules are built."
+            : "Your profile, document, and leave metrics are connected to Supabase. Timesheet reminders will appear after that module is built."}
         </div>
       </div>
     </div>

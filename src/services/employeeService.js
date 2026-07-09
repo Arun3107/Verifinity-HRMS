@@ -48,6 +48,7 @@ export async function getManagerOptions() {
 
 export async function createEmployeeProfile(payload) {
   const { data, error } = await supabase.rpc("create_employee_profile", {
+    p_employee_code: payload.employeeCode || null,
     p_full_name: payload.fullName,
     p_verifinity_email: payload.email,
     p_department_id: payload.departmentId || null,
@@ -153,6 +154,31 @@ export async function getMyProfileBundle(userId) {
     throw new Error("Employee profile not found.");
   }
 
+  let department = null;
+  let manager = null;
+
+  if (profile.department_id) {
+    const { data, error } = await supabase
+      .from("departments")
+      .select("id, name")
+      .eq("id", profile.department_id)
+      .maybeSingle();
+
+    if (error) throw error;
+    department = data;
+  }
+
+  if (profile.manager_id) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, full_name, designation, verifinity_email")
+      .eq("id", profile.manager_id)
+      .maybeSingle();
+
+    if (error) throw error;
+    manager = data;
+  }
+
   const { data: payroll, error: payrollError } = await supabase
     .from("employee_payroll_details")
     .select(
@@ -184,7 +210,11 @@ export async function getMyProfileBundle(userId) {
   if (payrollError) throw payrollError;
 
   return {
-    profile,
+    profile: {
+      ...profile,
+      departments: department,
+      manager,
+    },
     payroll,
   };
 }

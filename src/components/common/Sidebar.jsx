@@ -21,6 +21,7 @@ const employeeLinks = [
   { label: "My Assets", path: "/assets", icon: Laptop },
   { label: "My Timesheets", path: "/timesheets", icon: Clock },
   { label: "My Leave", path: "/leave", icon: CalendarDays },
+  { label: "Team Leave", path: "/manager-leave", icon: CalendarDays },
   { label: "Organization Tree", path: "/org-tree", icon: Network },
 ];
 
@@ -28,6 +29,9 @@ const adminLinks = [
   { label: "Dashboard", path: "/admin-dashboard", icon: LayoutDashboard },
   { label: "Employees", path: "/employees", icon: Users },
   { label: "Departments", path: "/departments", icon: Building2 },
+  { label: "Holiday Management", path: "/holidays", icon: CalendarDays },
+  { label: "Leave Policy", path: "/leave-policy", icon: CalendarDays },
+  { label: "Leave Reports", path: "/leave-reports", icon: BarChart3 },
   { label: "Reports", path: "/reports", icon: BarChart3 },
   { label: "Settings", path: "/settings", icon: Settings },
 ];
