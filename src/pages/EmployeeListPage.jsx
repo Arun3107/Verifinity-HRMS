@@ -17,6 +17,7 @@ export default function EmployeeListPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [onboardingFilter, setOnboardingFilter] = useState("all");
+  const [viewMode, setViewMode] = useState("all");
 
   useEffect(() => {
     async function loadEmployees() {
@@ -36,6 +37,7 @@ export default function EmployeeListPage() {
   function getOnboardingLabel(status) {
     if (status === "submitted") return "Submitted";
     if (status === "approved") return "Approved";
+    if (status === "changes_requested") return "Changes Requested";
     if (status === "rejected") return "Rejected";
     return "Invited";
   }
@@ -58,6 +60,10 @@ export default function EmployeeListPage() {
       return { ...base, background: "#dcfce7", color: "#166534" };
     }
 
+    if (status === "changes_requested") {
+      return { ...base, background: "#ffedd5", color: "#9a3412" };
+    }
+
     if (status === "rejected") {
       return { ...base, background: "#fee2e2", color: "#991b1b" };
     }
@@ -74,7 +80,10 @@ export default function EmployeeListPage() {
       onboardingFilter === "all" ||
       (employee.onboarding_status || "invited") === onboardingFilter;
 
-    return matchesSearch && matchesOnboarding;
+    const matchesView =
+      viewMode === "all" || employee.onboarding_status === "submitted";
+
+    return matchesSearch && matchesOnboarding && matchesView;
   });
 
   const totalEmployees = employees.length;
@@ -177,6 +186,50 @@ export default function EmployeeListPage() {
           <Plus size={18} />
           Add Employee
         </button>
+      </div>
+
+      <div
+        style={{
+          display: "inline-flex",
+          alignSelf: "flex-start",
+          gap: 6,
+          padding: 6,
+          borderRadius: 14,
+          border: "1px solid #e2e8f0",
+          background: "#ffffff",
+        }}
+      >
+        {[
+          { id: "all", label: `All Employees (${totalEmployees})` },
+          {
+            id: "pending",
+            label: `Pending Approval (${submittedEmployees})`,
+          },
+        ].map((tab) => {
+          const isActive = viewMode === tab.id;
+
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setViewMode(tab.id);
+                setOnboardingFilter("all");
+              }}
+              style={{
+                border: 0,
+                borderRadius: 10,
+                padding: "10px 14px",
+                background: isActive ? "#2563eb" : "transparent",
+                color: isActive ? "#ffffff" : "#475569",
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       <div
@@ -313,6 +366,7 @@ export default function EmployeeListPage() {
             <option value="all">All onboarding</option>
             <option value="invited">Invited</option>
             <option value="submitted">Submitted</option>
+            <option value="changes_requested">Changes Requested</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
@@ -381,6 +435,10 @@ export default function EmployeeListPage() {
                     borderTop: "1px solid #f1f5f9",
                     cursor: "pointer",
                     color: "#334155",
+                    background:
+                      employee.onboarding_status === "submitted"
+                        ? "#f8fbff"
+                        : "#ffffff",
                   }}
                 >
                   <td
@@ -447,7 +505,9 @@ export default function EmployeeListPage() {
                       }}
                     >
                       <Eye size={14} />
-                      Review
+                      {employee.onboarding_status === "submitted"
+                        ? "Review"
+                        : "View"}
                     </button>
                   </td>
                 </tr>

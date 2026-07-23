@@ -2,7 +2,6 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
-  FileText,
   Laptop,
   Clock,
   CalendarDays,
@@ -10,6 +9,7 @@ import {
   Building2,
   BarChart3,
   Settings,
+  ShieldCheck,
   UserRound,
 } from "lucide-react";
 import { useAuth } from "../../hooks/useAuth";
@@ -17,26 +17,44 @@ import { useAuth } from "../../hooks/useAuth";
 const employeeLinks = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "My Profile", path: "/profile", icon: UserRound },
-  { label: "My Documents", path: "/my-documents", icon: FileText },
   { label: "My Assets", path: "/assets", icon: Laptop },
   { label: "My Timesheets", path: "/timesheets", icon: Clock },
   { label: "My Leave", path: "/leave", icon: CalendarDays },
-  { label: "Team Leave", path: "/manager-leave", icon: CalendarDays },
+  {
+    label: "Leave Approvals",
+    path: "/manager-leave",
+    icon: ShieldCheck,
+    roles: ["manager"],
+  },
   { label: "Organization Tree", path: "/org-tree", icon: Network },
 ];
 
 const adminLinks = [
   { label: "Dashboard", path: "/admin-dashboard", icon: LayoutDashboard },
-  { label: "Employees", path: "/employees", icon: Users },
+  {
+    label: "Employees",
+    path: "/employees",
+    icon: Users,
+    roles: ["admin", "hr"],
+  },
   { label: "Departments", path: "/departments", icon: Building2 },
-  { label: "Holiday Management", path: "/holidays", icon: CalendarDays },
-  { label: "Leave Policy", path: "/leave-policy", icon: CalendarDays },
-  { label: "Leave Reports", path: "/leave-reports", icon: BarChart3 },
+  {
+    label: "Holiday Management",
+    path: "/holidays",
+    icon: CalendarDays,
+    roles: ["admin", "hr"],
+  },
+  {
+    label: "Leave Approvals",
+    path: "/manager-leave",
+    icon: ShieldCheck,
+    roles: ["admin", "hr"],
+  },
   { label: "Reports", path: "/reports", icon: BarChart3 },
   { label: "Settings", path: "/settings", icon: Settings },
 ];
 
-const adminRoles = ["admin", "hr", "payroll"];
+const adminRoles = ["admin", "hr"];
 
 function SidebarLink({ item }) {
   const Icon = item.icon;
@@ -96,7 +114,12 @@ export default function Sidebar() {
         padding: 20,
         display: "flex",
         flexDirection: "column",
-        minHeight: "100vh",
+        height: "100vh",
+        position: "sticky",
+        top: 0,
+        alignSelf: "flex-start",
+        overflowY: "auto",
+        flexShrink: 0,
       }}
     >
       <div
@@ -123,9 +146,11 @@ export default function Sidebar() {
 
       <SidebarSection title="Employee Portal">
         <nav style={{ display: "grid", gap: 6 }}>
-          {employeeLinks.map((item) => (
-            <SidebarLink key={`${item.label}-${item.path}`} item={item} />
-          ))}
+          {employeeLinks
+            .filter((item) => !item.roles || item.roles.includes(role))
+            .map((item) => (
+              <SidebarLink key={`${item.label}-${item.path}`} item={item} />
+            ))}
         </nav>
       </SidebarSection>
 
@@ -139,9 +164,11 @@ export default function Sidebar() {
         >
           <SidebarSection title="Admin Portal">
             <nav style={{ display: "grid", gap: 6 }}>
-              {adminLinks.map((item) => (
+              {adminLinks
+                .filter((item) => !item.roles || item.roles.includes(role))
+                .map((item) => (
                 <SidebarLink key={item.path} item={item} />
-              ))}
+                ))}
             </nav>
           </SidebarSection>
         </div>

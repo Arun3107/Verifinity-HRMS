@@ -5,8 +5,6 @@ import {
   ClipboardList,
   CalendarClock,
   AlertTriangle,
-  Laptop,
-  RotateCcw,
   UserRound,
   FileCheck,
   CalendarDays,
@@ -22,10 +20,11 @@ import {
   getPendingLeaveApprovals,
 } from "../services/leaveService";
 
-const adminRoles = ["admin", "hr", "payroll"];
+const adminRoles = ["admin", "hr"];
 
 function formatOnboardingStatus(status) {
   if (status === "submitted") return "Submitted for Review";
+  if (status === "changes_requested") return "Changes Requested";
   if (status === "approved") return "Approved";
   if (status === "rejected") return "Rejected";
   if (status === "invited") return "Invited";
@@ -149,8 +148,6 @@ export default function DashboardPage({ dashboardType = "employee" }) {
           value: leaveStats.pendingLeaveApprovals,
           icon: CalendarClock,
         },
-        { label: "Assets Issued", value: "0", icon: Laptop },
-        { label: "Assets Pending Return", value: "0", icon: RotateCcw },
       ]
     : [
         {
@@ -193,7 +190,7 @@ export default function DashboardPage({ dashboardType = "employee" }) {
         </h1>
         <p style={{ marginTop: 6, color: "#64748b" }}>
           {isAdminDashboard
-            ? "Overview of employees, onboarding, leave, timesheets, and assets."
+            ? "Track employee onboarding, missing documents, and pending approvals."
             : "Your employee workspace for profile, documents, leave, and timesheets."}
         </p>
       </div>
@@ -245,6 +242,81 @@ export default function DashboardPage({ dashboardType = "employee" }) {
           );
         })}
       </div>
+
+      {isAdminDashboard && (
+        <div
+          style={{
+            marginTop: 24,
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 800,
+              color: "#111827",
+              marginBottom: 16,
+            }}
+          >
+            Items Requiring Attention
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {[
+              {
+                label: "Onboarding profiles pending review",
+                value: stats?.pendingOnboarding ?? 0,
+              },
+              {
+                label: "Employees with missing documents",
+                value: stats?.employeesWithMissingDocuments ?? 0,
+              },
+              {
+                label: "Leave requests awaiting approval",
+                value: leaveStats.pendingLeaveApprovals,
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 12,
+                  padding: 16,
+                  background: "#f8fafc",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 800,
+                    color: item.value > 0 ? "#b45309" : "#15803d",
+                  }}
+                >
+                  {loading ? "..." : item.value}
+                </div>
+                <div
+                  style={{
+                    marginTop: 6,
+                    color: "#64748b",
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {item.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!isAdminDashboard && (
         <div
@@ -328,7 +400,7 @@ export default function DashboardPage({ dashboardType = "employee" }) {
 
         <div style={{ color: "#64748b", lineHeight: 1.6 }}>
           {isAdminDashboard
-            ? "Employee, onboarding, and pending leave approval metrics are now connected to Supabase. Timesheet and asset metrics will appear after those modules are built."
+            ? "Employee, onboarding, document, and leave approval metrics are connected to Supabase. Open the relevant module from the sidebar to take action."
             : "Your profile, document, and leave metrics are connected to Supabase. Timesheet reminders will appear after that module is built."}
         </div>
       </div>

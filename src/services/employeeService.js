@@ -1,4 +1,23 @@
 import { supabase } from "./supabaseClient";
+import { recalculateLeaveBalances } from "./leaveService";
+
+export const EMPLOYEE_DOCUMENT_TYPES = [
+  { type: "pan_card", label: "PAN Card", required: true },
+  { type: "aadhaar_card", label: "Aadhaar Card", required: true },
+  { type: "cancelled_cheque", label: "Cancelled Cheque", required: true },
+  { type: "uan_pf_document", label: "UAN / PF Document", required: false },
+];
+
+const REQUIRED_EMPLOYEE_DOCUMENT_TYPES = EMPLOYEE_DOCUMENT_TYPES.filter(
+  (documentType) => documentType.required,
+).map((documentType) => documentType.type);
+
+const MAX_ONBOARDING_DOCUMENT_SIZE = 5 * 1024 * 1024;
+const ALLOWED_ONBOARDING_DOCUMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+]);
 
 export async function getEmployees() {
   const { data, error } = await supabase
@@ -12,6 +31,9 @@ export async function getEmployees() {
       employment_status,
       role,
       onboarding_status,
+      onboarding_submitted_at,
+      onboarding_reviewed_at,
+      onboarding_review_comments,
       is_active
     `,
     )
@@ -61,6 +83,21 @@ export async function createEmployeeProfile(payload) {
 
   if (error) throw error;
 
+  const createdProfile = Array.isArray(data) ? data[0] : data;
+  const employeeId =
+    typeof createdProfile === "string" ? createdProfile : createdProfile?.id;
+
+  if (employeeId) {
+    try {
+      await recalculateLeaveBalances(employeeId);
+    } catch (balanceError) {
+      console.warn(
+        "Employee was created, but leave balance recalculation failed:",
+        balanceError.message,
+      );
+    }
+  }
+
   return data;
 }
 
@@ -81,6 +118,10 @@ export async function getEmployeeById(employeeId) {
       employment_status,
       role,
       onboarding_status,
+      onboarding_submitted_at,
+      onboarding_reviewed_at,
+      onboarding_reviewed_by,
+      onboarding_review_comments,
       is_active
     `,
     )
@@ -118,10 +159,41 @@ export async function getEmployeeById(employeeId) {
     manager = data;
   }
 
+  const { data: payrollDetails, error: payrollError } = await supabase
+    .from("employee_payroll_details")
+    .select(
+      `
+      bank_account_number,
+      bank_ifsc,
+      bank_name,
+      pan_number,
+      aadhaar_number,
+      uan_number,
+      pf_number,
+      date_of_birth,
+      gender,
+      earlier_epf_member,
+      earlier_eps_member,
+      previous_epf_account_number,
+      father_spouse_name,
+      marital_status,
+      pf_declaration_agreed,
+      personal_email,
+      emergency_contact_name,
+      emergency_contact_phone,
+      address
+    `,
+    )
+    .eq("employee_id", employeeId)
+    .maybeSingle();
+
+  if (payrollError) throw payrollError;
+
   return {
     ...profile,
     departments: department,
     manager,
+    payroll_details: payrollDetails,
   };
 }
 
@@ -142,6 +214,9 @@ export async function getMyProfileBundle(userId) {
       employment_status,
       role,
       onboarding_status,
+      onboarding_submitted_at,
+      onboarding_reviewed_at,
+      onboarding_review_comments,
       is_active
     `,
     )
@@ -217,55 +292,44 @@ export async function getMyProfileBundle(userId) {
   };
 }
 
-export async function submitMyProfile(userId, payload) {
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .update({
-      phone: payload.phone || null,
-      onboarding_status: "submitted",
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId);
+export async function submitMyProfile(_userId, payload) {
+  const { data, error } = await supabase.rpc("submit_employee_onboarding", {
+    p_phone: payload.phone,
+    p_personal_email: payload.personalEmail,
+    p_bank_account_number: payload.bankAccountNumber,
+    p_bank_ifsc: payload.bankIfsc,
+    p_bank_name: payload.bankName,
+    p_pan_number: payload.panNumber,
+    p_aadhaar_number: payload.aadhaarNumber,
+    p_uan_number: payload.uanNumber || null,
+    p_pf_number: payload.pfNumber || null,
+    p_date_of_birth: payload.dateOfBirth || null,
+    p_gender: payload.gender || null,
+    p_earlier_epf_member: payload.earlierEpfMember || null,
+    p_earlier_eps_member: payload.earlierEpsMember || null,
+    p_previous_epf_account_number:
+      payload.previousEpfAccountNumber || null,
+    p_father_spouse_name: payload.fatherSpouseName || null,
+    p_marital_status: payload.maritalStatus || null,
+    p_pf_declaration_agreed: Boolean(payload.pfDeclarationAgreed),
+    p_emergency_contact_name: payload.emergencyContactName,
+    p_emergency_contact_phone: payload.emergencyContactPhone,
+    p_address: payload.address,
+  });
 
-  if (profileError) throw profileError;
+  if (error) throw error;
 
-  const { error: payrollError } = await supabase
-    .from("employee_payroll_details")
-    .upsert(
-      {
-        employee_id: userId,
-        bank_account_number: payload.bankAccountNumber || null,
-        bank_ifsc: payload.bankIfsc || null,
-        bank_name: payload.bankName || null,
-        pan_number: payload.panNumber || null,
-        aadhaar_number: payload.aadhaarNumber || null,
-        uan_number: payload.uanNumber || null,
-        pf_number: payload.pfNumber || null,
-        date_of_birth: payload.dateOfBirth || null,
-        gender: payload.gender || null,
-        earlier_epf_member: payload.earlierEpfMember || null,
-        earlier_eps_member: payload.earlierEpsMember || null,
-        previous_epf_account_number: payload.previousEpfAccountNumber || null,
-        father_spouse_name: payload.fatherSpouseName || null,
-        marital_status: payload.maritalStatus || null,
-        pf_declaration_agreed: Boolean(payload.pfDeclarationAgreed),
-        personal_email: payload.personalEmail || null,
-        emergency_contact_name: payload.emergencyContactName || null,
-        emergency_contact_phone: payload.emergencyContactPhone || null,
-        address: payload.address || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "employee_id" },
-    );
-
-  if (payrollError) throw payrollError;
+  return data;
 }
 
 export async function getMyDocuments(userId) {
   const { data, error } = await supabase
     .from("employee_documents")
-    .select("id, document_type, file_name, file_path, uploaded_at, notes")
+    .select(
+      "id, document_type, file_name, file_path, uploaded_at, notes, is_current",
+    )
     .eq("employee_id", userId)
+    .eq("is_current", true)
     .order("uploaded_at", { ascending: false });
 
   if (error) throw error;
@@ -274,6 +338,18 @@ export async function getMyDocuments(userId) {
 }
 
 export async function uploadMyDocument(userId, documentType, file) {
+  if (!EMPLOYEE_DOCUMENT_TYPES.some((item) => item.type === documentType)) {
+    throw new Error("Unsupported document type.");
+  }
+
+  if (!ALLOWED_ONBOARDING_DOCUMENT_TYPES.has(file.type)) {
+    throw new Error("Upload a PDF, JPG, or PNG file.");
+  }
+
+  if (file.size > MAX_ONBOARDING_DOCUMENT_SIZE) {
+    throw new Error("Document size must be 5 MB or less.");
+  }
+
   const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const filePath = `${userId}/${documentType}/${Date.now()}-${safeFileName}`;
 
@@ -286,20 +362,20 @@ export async function uploadMyDocument(userId, documentType, file) {
 
   if (uploadError) throw uploadError;
 
-  const { data, error: insertError } = await supabase
-    .from("employee_documents")
-    .insert({
-      employee_id: userId,
-      document_type: documentType,
-      file_name: file.name,
-      file_path: filePath,
-      storage_bucket: "employee-documents",
-      uploaded_by: userId,
-    })
-    .select()
-    .single();
+  const { data, error: registrationError } = await supabase.rpc(
+    "register_employee_onboarding_document",
+    {
+      p_document_type: documentType,
+      p_file_name: file.name,
+      p_file_path: filePath,
+      p_storage_bucket: "employee-documents",
+    },
+  );
 
-  if (insertError) throw insertError;
+  if (registrationError) {
+    await supabase.storage.from("employee-documents").remove([filePath]);
+    throw registrationError;
+  }
 
   return data;
 }
@@ -316,15 +392,30 @@ export async function getEmployeeDocuments(employeeId) {
       file_path,
       storage_bucket,
       uploaded_at,
-      notes
+      notes,
+      is_current
     `,
     )
     .eq("employee_id", employeeId)
+    .eq("is_current", true)
     .order("uploaded_at", { ascending: false });
 
   if (error) throw error;
 
   return data || [];
+}
+
+export function hasRequiredEmployeeDocuments(documents = []) {
+  const uploaded = new Set(documents.map((doc) => doc.document_type));
+
+  return {
+    complete: REQUIRED_EMPLOYEE_DOCUMENT_TYPES.every((type) =>
+      uploaded.has(type),
+    ),
+    missing: REQUIRED_EMPLOYEE_DOCUMENT_TYPES.filter(
+      (type) => !uploaded.has(type),
+    ),
+  };
 }
 
 export async function createEmployeeDocumentSignedUrl(filePath) {
@@ -337,49 +428,79 @@ export async function createEmployeeDocumentSignedUrl(filePath) {
   return data?.signedUrl;
 }
 
-export async function updateEmployeeOnboardingStatus(employeeId, status) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({
-      onboarding_status: status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", employeeId)
-    .select()
-    .single();
+export async function approveEmployeeOnboarding(employeeId, comments = "") {
+  const { data, error } = await supabase.rpc("review_employee_onboarding", {
+    p_employee_id: employeeId,
+    p_action: "approve",
+    p_comments: comments,
+  });
 
   if (error) throw error;
 
   return data;
 }
 
-export async function approveEmployeeOnboarding(employeeId) {
-  return updateEmployeeOnboardingStatus(employeeId, "approved");
+export async function requestEmployeeOnboardingChanges(employeeId, comments) {
+  const { data, error } = await supabase.rpc("review_employee_onboarding", {
+    p_employee_id: employeeId,
+    p_action: "request_changes",
+    p_comments: comments,
+  });
+
+  if (error) throw error;
+
+  return data;
 }
 
-export async function rejectEmployeeOnboarding(employeeId) {
-  return updateEmployeeOnboardingStatus(employeeId, "rejected");
+export async function getEmployeeOnboardingHistory(employeeId) {
+  const { data, error } = await supabase
+    .from("onboarding_review_history")
+    .select(
+      `
+      id,
+      action,
+      previous_status,
+      new_status,
+      comments,
+      created_at,
+      acted_by,
+      actor:profiles!onboarding_review_history_acted_by_fkey(full_name)
+    `,
+    )
+    .eq("employee_id", employeeId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data || [];
 }
 
 export async function updateEmployeeEmploymentInfo(employeeId, payload) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({
-      employee_code: payload.employeeCode || null,
-      department_id: payload.departmentId || null,
-      designation: payload.designation || null,
-      manager_id: payload.managerId || null,
-      date_of_joining: payload.dateOfJoining || null,
-      employment_status: payload.employmentStatus || "active",
-      role: payload.role || "employee",
-      is_active: Boolean(payload.isActive),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", employeeId)
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc(
+    "update_employee_employment_info",
+    {
+      p_employee_id: employeeId,
+      p_employee_code: payload.employeeCode || null,
+      p_department_id: payload.departmentId || null,
+      p_designation: payload.designation || null,
+      p_manager_id: payload.managerId || null,
+      p_date_of_joining: payload.dateOfJoining || null,
+      p_employment_status: payload.employmentStatus || "active",
+      p_role: payload.role || "employee",
+      p_is_active: Boolean(payload.isActive),
+    },
+  );
 
   if (error) throw error;
+
+  try {
+    await recalculateLeaveBalances(employeeId);
+  } catch (balanceError) {
+    console.warn(
+      "Employment information was saved, but leave balance recalculation failed:",
+      balanceError.message,
+    );
+  }
 
   return data;
 }
@@ -394,13 +515,16 @@ export async function getAdminDashboardStats() {
     supabase.from("profiles").select("id", { count: "exact", head: true }),
     supabase
       .from("profiles")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "exact" })
       .eq("is_active", true),
     supabase
       .from("profiles")
       .select("id", { count: "exact", head: true })
-      .in("onboarding_status", ["pending", "invited", "submitted"]),
-    supabase.from("employee_documents").select("employee_id, document_type"),
+      .eq("onboarding_status", "submitted"),
+    supabase
+      .from("employee_documents")
+      .select("employee_id, document_type")
+      .eq("is_current", true),
   ]);
 
   if (totalEmployeesResult.error) throw totalEmployeesResult.error;
@@ -408,11 +532,8 @@ export async function getAdminDashboardStats() {
   if (pendingOnboardingResult.error) throw pendingOnboardingResult.error;
   if (documentRowsResult.error) throw documentRowsResult.error;
 
-  const requiredDocumentTypes = [
-    "pan_card",
-    "aadhaar_card",
-    "cancelled_cheque",
-  ];
+  const requiredDocumentTypes = REQUIRED_EMPLOYEE_DOCUMENT_TYPES;
+
   const documentsByEmployee = new Map();
 
   for (const document of documentRowsResult.data || []) {
@@ -425,7 +546,9 @@ export async function getAdminDashboardStats() {
 
   let employeesWithMissingDocuments = 0;
 
-  for (const documentTypes of documentsByEmployee.values()) {
+  for (const employee of activeEmployeesResult.data || []) {
+    const documentTypes =
+      documentsByEmployee.get(employee.id) || new Set();
     const hasAllRequired = requiredDocumentTypes.every((type) =>
       documentTypes.has(type),
     );
@@ -462,7 +585,8 @@ export async function getEmployeeDashboardStats(userId) {
     supabase
       .from("employee_documents")
       .select("document_type")
-      .eq("employee_id", userId),
+      .eq("employee_id", userId)
+      .eq("is_current", true),
   ]);
 
   if (profileResult.error) throw profileResult.error;
@@ -472,11 +596,7 @@ export async function getEmployeeDashboardStats(userId) {
   const profile = profileResult.data || {};
   const payroll = payrollResult.data || {};
 
-  const requiredDocumentTypes = [
-    "pan_card",
-    "aadhaar_card",
-    "cancelled_cheque",
-  ];
+  const requiredDocumentTypes = REQUIRED_EMPLOYEE_DOCUMENT_TYPES;
 
   const uploadedTypes = new Set(
     (documentsResult.data || []).map((document) => document.document_type),
@@ -494,6 +614,7 @@ export async function getEmployeeDashboardStats(userId) {
   if (payroll.aadhaar_number) profileCompletion += 20;
   if (
     profile.onboarding_status === "submitted" ||
+    profile.onboarding_status === "changes_requested" ||
     profile.onboarding_status === "approved"
   ) {
     profileCompletion += 20;

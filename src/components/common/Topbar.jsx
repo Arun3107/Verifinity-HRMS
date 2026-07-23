@@ -46,7 +46,7 @@ const pageLabels = {
   },
   "/reports": {
     title: "Reports",
-    subtitle: "Export employee, timesheet, and payroll-ready reports.",
+    subtitle: "Review and export monthly leave and LOP reports.",
   },
   "/settings": {
     title: "Settings",

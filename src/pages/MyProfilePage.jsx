@@ -5,6 +5,7 @@ import {
   Building2,
   CheckCircle2,
   CreditCard,
+  FileText,
   HeartPulse,
   Landmark,
   Mail,
@@ -15,6 +16,11 @@ import { useAuth } from "../hooks/useAuth";
 import {
   getMyProfileBundle,
   submitMyProfile,
+  getMyDocuments,
+  uploadMyDocument,
+  createEmployeeDocumentSignedUrl,
+  EMPLOYEE_DOCUMENT_TYPES,
+  hasRequiredEmployeeDocuments,
 } from "../services/employeeService";
 
 const inputStyle = {
@@ -111,21 +117,41 @@ function ReadOnlyField({ label, value, icon: Icon }) {
       <div style={labelStyle}>{label}</div>
       <div
         style={{
-          minHeight: 46,
+          width: "100%",
+          height: 46,
           padding: "12px 14px",
-          border: "1px solid #e6eaf0",
+          border: "1px solid #d9e0ea",
           borderRadius: 12,
-          background: "#f8fafc",
+          background: "#ffffff",
           color: "#0f172a",
           display: "flex",
           alignItems: "center",
           gap: 9,
           boxSizing: "border-box",
+          boxShadow: "0 1px 2px rgba(15, 23, 42, 0.03)",
+          fontSize: 14,
           fontWeight: 400,
+          lineHeight: 1.2,
+          minWidth: 0,
         }}
       >
-        {Icon && <Icon size={16} color="#64748b" />}
-        <span>{value || "-"}</span>
+        {Icon && <Icon size={16} color="#64748b" style={{ flexShrink: 0 }} />}
+        <span
+          title={value || "-"}
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            fontSize: 14,
+            fontWeight: 400,
+            lineHeight: 1.2,
+            display: "block",
+            flex: 1,
+          }}
+        >
+          {value || "-"}
+        </span>
       </div>
     </div>
   );
@@ -158,13 +184,15 @@ function Field({ label, required, children }) {
 }
 
 export default function MyProfilePage() {
-  const { user, profile: authProfile } = useAuth();
+  const { profile: authProfile } = useAuth();
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [successText, setSuccessText] = useState("");
+  const [documents, setDocuments] = useState([]);
+  const [uploadingType, setUploadingType] = useState("");
 
   const [form, setForm] = useState({
     phone: "",
@@ -196,11 +224,15 @@ export default function MyProfilePage() {
       if (!authProfile?.id) return;
 
       try {
-        const data = await getMyProfileBundle(authProfile.id);
+        const [data, documentData] = await Promise.all([
+          getMyProfileBundle(authProfile.id),
+          getMyDocuments(authProfile.id),
+        ]);
 
         if (!isMounted) return;
 
         setProfile(data.profile);
+        setDocuments(documentData);
         setForm({
           phone: data.profile?.phone || "",
           personalEmail: data.payroll?.personal_email || "",
@@ -249,6 +281,44 @@ export default function MyProfilePage() {
     }));
   }
 
+  function getDocument(documentType) {
+    return documents.find((doc) => doc.document_type === documentType) || null;
+  }
+
+  async function handleDocumentUpload(documentType, file) {
+    if (!file || !authProfile?.id) return;
+
+    setErrorText("");
+    setSuccessText("");
+    setUploadingType(documentType);
+
+    try {
+      const uploaded = await uploadMyDocument(
+        authProfile.id,
+        documentType,
+        file,
+      );
+
+      setDocuments((current) => [
+        uploaded,
+        ...current.filter((doc) => doc.document_type !== documentType),
+      ]);
+      setSuccessText("Document uploaded successfully.");
+    } catch (error) {
+      console.error(error);
+      setErrorText(error.message);
+    } finally {
+      setUploadingType("");
+    }
+  }
+
+  async function handleViewDocument(document) {
+    if (!document) return;
+
+    const url = await createEmployeeDocumentSignedUrl(document.file_path);
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setErrorText("");
@@ -256,6 +326,12 @@ export default function MyProfilePage() {
     setSaving(true);
 
     try {
+      const requiredDocumentStatus = hasRequiredEmployeeDocuments(documents);
+
+      if (!requiredDocumentStatus.complete) {
+        throw new Error("Upload PAN, Aadhaar, and cancelled cheque first.");
+      }
+
       await submitMyProfile(authProfile.id, form);
       setSuccessText("Profile submitted successfully for HR review.");
       setProfile((current) => ({
@@ -281,6 +357,16 @@ export default function MyProfilePage() {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+  const onboardingStatus = profile?.onboarding_status || "invited";
+  const onboardingStatusLabel =
+    onboardingStatus === "submitted"
+      ? "Pending HR review"
+      : onboardingStatus === "changes_requested"
+        ? "Changes requested"
+        : onboardingStatus === "approved"
+          ? "Approved"
+          : "Profile setup pending";
+  const requiredDocumentStatus = hasRequiredEmployeeDocuments(documents);
 
   return (
     <div style={{ maxWidth: 1320 }}>
@@ -409,6 +495,35 @@ export default function MyProfilePage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div
+        style={{
+          background:
+            onboardingStatus === "changes_requested" ? "#fff7ed" : "#eff6ff",
+          color:
+            onboardingStatus === "changes_requested" ? "#9a3412" : "#1e40af",
+          border: `1px solid ${
+            onboardingStatus === "changes_requested" ? "#fed7aa" : "#bfdbfe"
+          }`,
+          borderRadius: 14,
+          padding: 14,
+          marginBottom: 18,
+          fontWeight: 700,
+        }}
+      >
+        <div>{onboardingStatusLabel}</div>
+        {onboardingStatus === "submitted" && (
+          <div style={{ marginTop: 5, fontSize: 13, fontWeight: 500 }}>
+            Your account remains active while admin reviews your information.
+          </div>
+        )}
+        {onboardingStatus === "changes_requested" && (
+          <div style={{ marginTop: 5, fontSize: 13, fontWeight: 500 }}>
+            {profile?.onboarding_review_comments ||
+              "Please update the requested details and resubmit."}
+          </div>
+        )}
       </div>
 
       {errorText && (
@@ -712,8 +827,8 @@ export default function MyProfilePage() {
               />
               <div>
                 UAN and PF details are optional. If you already have an existing
-                PF / EPF account number, enter it here and upload supporting
-                documents from My Documents.
+                PF / EPF account number, enter it here and upload the required
+                documents in the Documents section below.
               </div>
             </div>
             <div style={{ marginTop: 18 }}>
@@ -822,6 +937,167 @@ export default function MyProfilePage() {
               </div>
             </FormGrid>
           </SectionCard>
+          <SectionCard
+            icon={CreditCard}
+            title="Documents"
+            description="Upload the mandatory documents required for payroll processing."
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {EMPLOYEE_DOCUMENT_TYPES.map((item) => {
+                const doc = getDocument(item.type);
+                const isUploading = uploadingType === item.type;
+
+                return (
+                  <div
+                    key={item.type}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      padding: 14,
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 14,
+                      background: "#f8fafc",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        minWidth: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
+                          background: "#eff6ff",
+                          color: "#2563eb",
+                          display: "grid",
+                          placeItems: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <FileText size={16} />
+                      </div>
+
+                      <div style={{ minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: "#0f172a",
+                          }}
+                        >
+                          {item.label}
+                          {item.required ? " *" : ""}
+                        </div>
+
+                        <div
+                          style={{
+                            marginTop: 3,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: doc ? "#15803d" : "#b91c1c",
+                          }}
+                        >
+                          {doc ? "Uploaded" : "Not uploaded"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {doc?.file_name && (
+                      <div
+                        title={doc.file_name}
+                        style={{
+                          fontSize: 11,
+                          color: "#64748b",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {doc.file_name}
+                      </div>
+                    )}
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginTop: "auto",
+                      }}
+                    >
+                      <label
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: 76,
+                          padding: "7px 11px",
+                          borderRadius: 9,
+                          background: "#2563eb",
+                          color: "#ffffff",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: isUploading ? "not-allowed" : "pointer",
+                          opacity: isUploading ? 0.7 : 1,
+                        }}
+                      >
+                        {isUploading
+                          ? "Uploading..."
+                          : doc
+                            ? "Replace"
+                            : "Upload"}
+                        <input
+                          type="file"
+                          hidden
+                          disabled={isUploading}
+                          accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                          onChange={(event) => {
+                            handleDocumentUpload(
+                              item.type,
+                              event.target.files?.[0],
+                            );
+                            event.target.value = "";
+                          }}
+                        />
+                      </label>
+
+                      {doc && (
+                        <button
+                          type="button"
+                          onClick={() => handleViewDocument(doc)}
+                          style={{
+                            minWidth: 62,
+                            padding: "7px 11px",
+                            borderRadius: 9,
+                            border: "1px solid #cbd5e1",
+                            background: "#ffffff",
+                            color: "#334155",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                          }}
+                        >
+                          View
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
         </div>
 
         <div
@@ -836,7 +1112,7 @@ export default function MyProfilePage() {
         >
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || !requiredDocumentStatus.complete}
             style={{
               pointerEvents: "auto",
               display: "flex",
@@ -848,15 +1124,22 @@ export default function MyProfilePage() {
               color: "#ffffff",
               borderRadius: 999,
               padding: "13px 20px",
-              cursor: saving ? "not-allowed" : "pointer",
+              cursor:
+                saving || !requiredDocumentStatus.complete
+                  ? "not-allowed"
+                  : "pointer",
               fontWeight: 850,
               minWidth: 190,
-              opacity: saving ? 0.75 : 1,
+              opacity: saving || !requiredDocumentStatus.complete ? 0.65 : 1,
               boxShadow: "0 18px 38px rgba(37, 99, 235, 0.28)",
             }}
           >
             <Save size={17} />
-            {saving ? "Submitting..." : "Submit Profile"}
+            {saving
+              ? "Submitting..."
+              : onboardingStatus === "changes_requested"
+                ? "Resubmit Profile"
+                : "Submit Profile"}
           </button>
         </div>
       </form>

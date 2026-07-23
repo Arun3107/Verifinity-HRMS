@@ -1,24 +1,41 @@
 import { useEffect, useState } from "react";
 import {
+  CalendarDays,
+  Info,
+  ListChecks,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
   createHoliday,
   deleteHoliday,
   getHolidayCalendar,
   updateHoliday,
 } from "../../services/leaveService";
+import {
+  EmptyTableRow,
+  FormGrid,
+  LeaveAlert,
+  LeaveButton,
+  LeaveField,
+  LeavePage,
+  LeaveSection,
+  LeaveTable,
+  LoadingText,
+} from "../../components/leave/LeaveManagementUI";
+import {
+  inputStyle,
+  tableCellStyle,
+} from "../../components/leave/leaveStyles";
+import { formatLeaveDate } from "../../utils/leaveUtils";
 
 const initialForm = {
   holiday_date: "",
   name: "",
 };
-
-function formatDate(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 export default function HolidayManagementPage() {
   const [holidays, setHolidays] = useState([]);
@@ -26,37 +43,45 @@ export default function HolidayManagementPage() {
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [actionId, setActionId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  async function loadHolidays() {
-    setLoading(true);
+  async function loadHolidays(showLoading = true) {
+    if (showLoading) setLoading(true);
     setError("");
 
     try {
-      const data = await getHolidayCalendar();
-      setHolidays(data);
+      setHolidays(await getHolidayCalendar());
     } catch (err) {
       setError(err.message || "Unable to load holidays.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
   useEffect(() => {
-    async function loadInitialHolidays() {
-      await loadHolidays();
-    }
+    let active = true;
 
-    loadInitialHolidays();
+    getHolidayCalendar()
+      .then((data) => {
+        if (active) setHolidays(data);
+      })
+      .catch((err) => {
+        if (active) setError(err.message || "Unable to load holidays.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: value,
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
   }
 
   function handleEdit(holiday) {
@@ -67,6 +92,7 @@ export default function HolidayManagementPage() {
     });
     setError("");
     setSuccess("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleCancelEdit() {
@@ -86,26 +112,35 @@ export default function HolidayManagementPage() {
       return;
     }
 
+    const duplicateHoliday = holidays.find(
+      (holiday) =>
+        holiday.holiday_date === form.holiday_date && holiday.id !== editingId,
+    );
+
+    if (duplicateHoliday) {
+      setError(`${duplicateHoliday.name} already exists on the selected date.`);
+      return;
+    }
+
     setSaving(true);
 
     try {
+      const values = {
+        holiday_date: form.holiday_date,
+        name: form.name.trim(),
+      };
+
       if (editingId) {
-        await updateHoliday(editingId, {
-          holiday_date: form.holiday_date,
-          name: form.name.trim(),
-        });
+        await updateHoliday(editingId, values);
         setSuccess("Holiday updated successfully.");
       } else {
-        await createHoliday({
-          holiday_date: form.holiday_date,
-          name: form.name.trim(),
-        });
+        await createHoliday(values);
         setSuccess("Holiday added successfully.");
       }
 
       setEditingId("");
       setForm(initialForm);
-      await loadHolidays();
+      await loadHolidays(false);
     } catch (err) {
       setError(err.message || "Unable to save holiday.");
     } finally {
@@ -113,169 +148,202 @@ export default function HolidayManagementPage() {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(holiday) {
+    const confirmed = window.confirm(
+      `Remove ${holiday.name} from the active holiday calendar?`,
+    );
+    if (!confirmed) return;
+
     setError("");
     setSuccess("");
-    setSaving(true);
+    setActionId(holiday.id);
 
     try {
-      await deleteHoliday(id);
+      await deleteHoliday(holiday.id);
+      if (editingId === holiday.id) handleCancelEdit();
       setSuccess("Holiday removed successfully.");
-      await loadHolidays();
+      await loadHolidays(false);
     } catch (err) {
       setError(err.message || "Unable to remove holiday.");
     } finally {
-      setSaving(false);
+      setActionId("");
     }
   }
 
-  if (loading) {
-    return <div className="page-card">Loading holidays...</div>;
-  }
+  if (loading) return <LoadingText>Loading holidays...</LoadingText>;
 
   return (
-    <div className="page-stack">
-      <div className="page-header">
-        <div>
-          <h1>Holiday Management</h1>
-          <p>
-            Configure public holidays that should not deduct employee leave
-            balance.
-          </p>
+    <LeavePage
+      icon={CalendarDays}
+      title="Holiday Management"
+      description="Configure holidays excluded from employee leave calculations."
+      headerContent={
+        <div
+          style={{
+            minWidth: 170,
+            padding: 14,
+            border: "1px solid rgba(255,255,255,0.14)",
+            borderRadius: 16,
+            background: "rgba(255,255,255,0.08)",
+          }}
+        >
+          <div style={{ color: "#93c5fd", fontSize: 11, fontWeight: 850 }}>
+            ACTIVE HOLIDAYS
+          </div>
+          <div style={{ marginTop: 5, fontSize: 22, fontWeight: 900 }}>
+            {holidays.length}
+          </div>
         </div>
-      </div>
+      }
+    >
+      {error && <LeaveAlert type="error">{error}</LeaveAlert>}
+      {success && <LeaveAlert type="success">{success}</LeaveAlert>}
 
-      {error ? <div className="alert alert-error">{error}</div> : null}
-      {success ? <div className="alert alert-success">{success}</div> : null}
-
-      <div className="content-grid two-column-grid">
-        <section className="page-card">
-          <h2>{editingId ? "Edit Holiday" : "Add Holiday"}</h2>
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <label>
-              Holiday Date
-              <input
-                type="date"
-                name="holiday_date"
-                value={form.holiday_date}
-                onChange={handleChange}
-              />
-            </label>
-
-            <label>
-              Holiday Name
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                placeholder="Example: Independence Day"
-              />
-            </label>
-
-            <div className="form-actions full-width">
-              <button
-                type="submit"
-                className="primary-button"
-                disabled={saving}
-              >
-                {saving
-                  ? "Saving..."
-                  : editingId
-                    ? "Update Holiday"
-                    : "Add Holiday"}
-              </button>
-              {editingId ? (
-                <button
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+          gap: 18,
+          alignItems: "start",
+        }}
+      >
+        <LeaveSection
+          icon={editingId ? Pencil : Plus}
+          title={editingId ? "Edit Holiday" : "Add Holiday"}
+          description="Add a date once; duplicate holiday dates are not allowed."
+        >
+          <form onSubmit={handleSubmit}>
+            <FormGrid minWidth={210}>
+              <LeaveField label="Holiday Date" required>
+                <input
+                  type="date"
+                  name="holiday_date"
+                  value={form.holiday_date}
+                  onChange={handleChange}
+                  onClick={(event) => event.currentTarget.showPicker?.()}
+                  style={{ ...inputStyle, colorScheme: "light", cursor: "pointer" }}
+                />
+              </LeaveField>
+              <LeaveField label="Holiday Name" required>
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Example: Independence Day"
+                  style={inputStyle}
+                />
+              </LeaveField>
+            </FormGrid>
+            <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+              <LeaveButton type="submit" icon={Save} disabled={saving}>
+                {saving ? "Saving..." : editingId ? "Update Holiday" : "Add Holiday"}
+              </LeaveButton>
+              {editingId && (
+                <LeaveButton
                   type="button"
-                  className="secondary-button"
+                  variant="secondary"
+                  icon={X}
                   onClick={handleCancelEdit}
+                  disabled={saving}
                 >
                   Cancel
-                </button>
-              ) : null}
+                </LeaveButton>
+              )}
             </div>
           </form>
-        </section>
+        </LeaveSection>
 
-        <section className="page-card">
-          <h2>Holiday Rules</h2>
-          <div className="simple-list">
-            <div className="simple-list-item">
-              <div>
-                <strong>Weekends</strong>
-                <p>Saturday and Sunday are automatically excluded.</p>
-              </div>
-            </div>
-            <div className="simple-list-item">
-              <div>
-                <strong>Public Holidays</strong>
-                <p>
-                  Active holidays in this list are excluded from leave-day
-                  calculation.
+        <LeaveSection
+          icon={Info}
+          title="Holiday Rules"
+          description="How holidays affect employee leave requests."
+        >
+          <div style={{ display: "grid", gap: 12 }}>
+            {[
+              {
+                title: "Weekends",
+                text: "Saturday and Sunday are automatically excluded from working leave days.",
+              },
+              {
+                title: "Public Holidays",
+                text: "Every active date below is excluded when leave days are calculated.",
+              },
+            ].map((rule) => (
+              <div
+                key={rule.title}
+                style={{
+                  padding: 14,
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 14,
+                  background: "#f8fafc",
+                }}
+              >
+                <strong style={{ color: "#0f172a", fontSize: 14 }}>{rule.title}</strong>
+                <p
+                  style={{
+                    margin: "5px 0 0",
+                    color: "#64748b",
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {rule.text}
                 </p>
               </div>
-            </div>
+            ))}
           </div>
-        </section>
+        </LeaveSection>
       </div>
 
-      <section className="page-card">
-        <div className="section-header">
-          <div>
-            <h2>Holiday Calendar</h2>
-            <p>
-              {holidays.length} active holiday{holidays.length === 1 ? "" : "s"}
-            </p>
-          </div>
-        </div>
-
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Holiday</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {holidays.length === 0 ? (
-                <tr>
-                  <td colSpan="3">No holidays configured.</td>
+      <div style={{ marginTop: 18 }}>
+        <LeaveSection
+          icon={ListChecks}
+          title="Holiday Calendar"
+          description={`${holidays.length} active holiday${holidays.length === 1 ? "" : "s"}.`}
+        >
+          <LeaveTable headers={["Date", "Holiday", "Action"]} minWidth={620}>
+            {holidays.length === 0 ? (
+              <EmptyTableRow colSpan={3}>No holidays configured.</EmptyTableRow>
+            ) : (
+              holidays.map((holiday) => (
+                <tr key={holiday.id}>
+                  <td style={{ ...tableCellStyle, whiteSpace: "nowrap" }}>
+                    {formatLeaveDate(holiday.holiday_date)}
+                  </td>
+                  <td style={{ ...tableCellStyle, color: "#0f172a", fontWeight: 750 }}>
+                    {holiday.name}
+                  </td>
+                  <td style={tableCellStyle}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <LeaveButton
+                        type="button"
+                        variant="secondary"
+                        icon={Pencil}
+                        onClick={() => handleEdit(holiday)}
+                        disabled={Boolean(actionId) || saving}
+                        style={{ borderRadius: 10, padding: "8px 11px" }}
+                      >
+                        Edit
+                      </LeaveButton>
+                      <LeaveButton
+                        type="button"
+                        variant="danger"
+                        icon={Trash2}
+                        onClick={() => handleDelete(holiday)}
+                        disabled={Boolean(actionId) || saving}
+                        style={{ borderRadius: 10, padding: "8px 11px" }}
+                      >
+                        {actionId === holiday.id ? "Removing..." : "Remove"}
+                      </LeaveButton>
+                    </div>
+                  </td>
                 </tr>
-              ) : (
-                holidays.map((holiday) => (
-                  <tr key={holiday.id}>
-                    <td>{formatDate(holiday.holiday_date)}</td>
-                    <td>{holiday.name}</td>
-                    <td>
-                      <div className="button-row">
-                        <button
-                          type="button"
-                          className="secondary-button"
-                          onClick={() => handleEdit(holiday)}
-                          disabled={saving}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="danger-button"
-                          onClick={() => handleDelete(holiday.id)}
-                          disabled={saving}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
+              ))
+            )}
+          </LeaveTable>
+        </LeaveSection>
+      </div>
+    </LeavePage>
   );
 }

@@ -7,10 +7,10 @@ export default function AppLayout() {
     <div
       style={{
         display: "flex",
-        minHeight: "100vh",
+        height: "100vh",
         width: "100vw",
         background: "#f8fafc",
-        overflowX: "hidden",
+        overflow: "hidden",
       }}
     >
       <Sidebar />
@@ -20,6 +20,9 @@ export default function AppLayout() {
           flex: 1,
           display: "flex",
           flexDirection: "column",
+          minWidth: 0,
+          height: "100vh",
+          overflow: "hidden",
         }}
       >
         <Topbar />
@@ -29,7 +32,11 @@ export default function AppLayout() {
             flex: 1,
             padding: "24px",
             width: "100%",
+            minWidth: 0,
             boxSizing: "border-box",
+            overflowY: "auto",
+            overflowX: "hidden",
+            minHeight: 0,
           }}
         >
           <Outlet />

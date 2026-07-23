@@ -10,13 +10,11 @@ import EmployeeCreatePage from "./pages/employees/EmployeeCreatePage";
 import EmployeeDetailsPage from "./pages/employees/EmployeeDetailsPage";
 
 import MyProfilePage from "./pages/MyProfilePage";
-import MyDocumentsPage from "./pages/MyDocumentsPage";
 import MyLeavePage from "./pages/leave/MyLeavePage";
 import ManagerLeavePage from "./pages/leave/ManagerLeavePage";
 import DepartmentsPage from "./pages/admin/DepartmentsPage";
 import HolidayManagementPage from "./pages/admin/HolidayManagementPage";
-import LeavePolicyPage from "./pages/admin/LeavePolicyPage";
-import LeaveReportsPage from "./pages/admin/LeaveReportsPage";
+import ReportsPage from "./pages/reports/ReportsPage";
 
 function App() {
   return (
@@ -38,7 +36,7 @@ function App() {
           <Route
             path="/admin-dashboard"
             element={
-              <ProtectedRoute allowedRoles={["admin", "hr", "payroll"]}>
+              <ProtectedRoute allowedRoles={["admin", "hr"]}>
                 <DashboardPage dashboardType="admin" />
               </ProtectedRoute>
             }
@@ -46,7 +44,7 @@ function App() {
           <Route
             path="/employees"
             element={
-              <ProtectedRoute allowedRoles={["admin", "hr", "payroll"]}>
+              <ProtectedRoute allowedRoles={["admin", "hr"]}>
                 <EmployeeListPage />
               </ProtectedRoute>
             }
@@ -62,7 +60,7 @@ function App() {
           <Route
             path="/employees/:id"
             element={
-              <ProtectedRoute allowedRoles={["admin", "hr", "payroll"]}>
+              <ProtectedRoute allowedRoles={["admin", "hr"]}>
                 <EmployeeDetailsPage />
               </ProtectedRoute>
             }
@@ -70,7 +68,7 @@ function App() {
           <Route
             path="/departments"
             element={
-              <ProtectedRoute allowedRoles={["admin", "hr", "payroll"]}>
+              <ProtectedRoute allowedRoles={["admin", "hr"]}>
                 <DepartmentsPage />
               </ProtectedRoute>
             }
@@ -83,26 +81,24 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/profile" element={<MyProfilePage />} />
+          <Route path="/leave" element={<MyLeavePage />} />
           <Route
-            path="/leave-policy"
+            path="/manager-leave"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "hr", "manager"]}>
+                <ManagerLeavePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/reports"
             element={
               <ProtectedRoute allowedRoles={["admin", "hr"]}>
-                <LeavePolicyPage />
+                <ReportsPage />
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/leave-reports"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "hr", "payroll"]}>
-                <LeaveReportsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/profile" element={<MyProfilePage />} />
-          <Route path="/my-documents" element={<MyDocumentsPage />} />
-          <Route path="/leave" element={<MyLeavePage />} />
-          <Route path="/manager-leave" element={<ManagerLeavePage />} />
         </Route>
       </Routes>
     </BrowserRouter>
